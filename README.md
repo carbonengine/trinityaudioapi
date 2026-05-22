@@ -43,8 +43,7 @@ target_link_libraries(YourTarget INTERFACE CarbonTrinityAudioAPI)
 
 
 - Insert any dependencies you might need into the `vcpkg.json` file
-- Consult the [VCPKG documentation](https://learn.microsoft.com/en-us/vcpkg/) or our [migration guide](https://ccpgames.atlassian.net/wiki/spaces/TC/pages/1104052275/Guide+to+Migrating+Carbon+Components+to+VCPKG) for more information on the VCPKG integration.
-- For information on common VCPKG workflows, consult this [wiki page](https://ccpgames.atlassian.net/wiki/spaces/TC/pages/1140359350/Common+VCPKG+Usage+Guides)
+- Consult the [VCPKG documentation](https://learn.microsoft.com/en-us/vcpkg/) for more information on the VCPKG integration.
 
 # CI Pipeline Documentation
 
