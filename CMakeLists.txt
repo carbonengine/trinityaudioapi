@@ -34,3 +34,8 @@ if(CMAKE_PROJECT_NAME STREQUAL CcpTrinityAudioAPI)
             FILE carbon-trinityaudioapiConfig.cmake
     )
 endif()
+
+# DEMO ONLY: intentionally crashing test, do not merge
+enable_testing()
+add_executable(DemoCrashTest demo/crash_test.cpp)
+add_test(NAME DemoCrashTest COMMAND DemoCrashTest)
