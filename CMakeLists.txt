@@ -34,3 +34,6 @@ if(CMAKE_PROJECT_NAME STREQUAL CcpTrinityAudioAPI)
             FILE carbon-trinityaudioapiConfig.cmake
     )
 endif()
+
+# DEMO ONLY: intentional compile error, do not merge
+add_executable(DemoCompileError demo/compile_error.cpp)
