@@ -15,6 +15,7 @@ target_sources(CcpTrinityAudioAPI INTERFACE
         include/IStretchAudio.h
         include/ITr2AudEmitter.h
         include/ITr2AudGeometry.h
+        include/ITr2AudParentBall.h
         include/ITr2BoxVolume.h
         include/ITr2Audio.h
 )
