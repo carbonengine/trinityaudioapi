@@ -5,6 +5,8 @@ import jetbrains.buildServer.configs.kotlin.DslContext
 import jetbrains.buildServer.configs.kotlin.Project
 import jetbrains.buildServer.configs.kotlin.*
 import jetbrains.buildServer.configs.kotlin.buildFeatures.PullRequests
+import jetbrains.buildServer.configs.kotlin.failureConditions.BuildFailureOnText
+import jetbrains.buildServer.configs.kotlin.failureConditions.failOnText
 import jetbrains.buildServer.configs.kotlin.buildFeatures.XmlReport
 import jetbrains.buildServer.configs.kotlin.buildFeatures.commitStatusPublisher
 import jetbrains.buildServer.configs.kotlin.buildFeatures.freeDiskSpace
@@ -52,7 +54,12 @@ class CarbonBuildMacOS(buildName: String, configType: String, preset: String, ag
     id(buildName.toId())
     name = buildName
 
-    artifactRules = "%env.CMAKE_INSTALL_PREFIX% => artifact.zip"
+    artifactRules = """
+        %env.CMAKE_INSTALL_PREFIX% => artifact.zip
+        %github_checkout_folder%/buildtrees/**/*.log => vcpkg-logs.zip
+        %env.CMAKE_BUILD_FOLDER%/vcpkg-manifest-install.log => vcpkg-logs.zip
+        crashdumps => crashdumps.zip
+    """.trimIndent()
 
     params {
         param("env.SENTRY_CLI_DEBUG_SYMBOL_TYPE", "dsym")
@@ -107,16 +114,38 @@ class CarbonBuildMacOS(buildName: String, configType: String, preset: String, ag
             path = "cmake"
             arguments = "--preset %env.CMAKE_PRESET% -S %teamcity.build.checkoutDir%/%github_checkout_folder% -B %env.CMAKE_BUILD_FOLDER% -DINSTALL_TO_MONOLITH=ON -DCMAKE_INSTALL_PREFIX=%env.CMAKE_INSTALL_PREFIX% -DVCPKG_INSTALL_OPTIONS=--x-buildtrees-root=%teamcity.build.checkoutDir%/%github_checkout_folder%/buildtrees"
         }
+        script {
+            name = "Print vcpkg logs"
+            executionMode = BuildStep.ExecutionMode.RUN_ON_FAILURE
+            scriptContent = """
+                tail -n 60 %teamcity.build.checkoutDir%/%github_checkout_folder%/buildtrees/*/*-err.log %teamcity.build.checkoutDir%/%github_checkout_folder%/buildtrees/*/*-out.log %teamcity.build.checkoutDir%/%env.CMAKE_BUILD_FOLDER%/vcpkg-manifest-install.log || true
+            """.trimIndent()
+        }
         exec {
             name = "Build"
             path = "cmake"
             arguments = "--build %env.CMAKE_BUILD_FOLDER% --config %env.CMAKE_CONFIG_TYPE% --target %env.CMAKE_BUILD_TARGETS%"
         }
         exec {
+            name = "(macOS) Mark start of tests"
+            path = "touch"
+            arguments = ".tests-started"
+        }
+        exec {
             name = "Run Tests"
             workingDir = "%env.CMAKE_BUILD_FOLDER%"
             path = "ctest"
             arguments = "-C %env.CMAKE_CONFIG_TYPE% -V --output-on-failure --output-junit %env.CTEST_JUNIT_OUTPUT_FILE%"
+        }
+        script {
+            name = "(macOS) Collect crash reports"
+            executionMode = BuildStep.ExecutionMode.RUN_ON_FAILURE
+            scriptContent = """
+                mkdir -p crashdumps
+                if [ -f .tests-started ]; then
+                  find ~/Library/Logs/DiagnosticReports -newer .tests-started \( -name '*.ips' -o -name '*.crash' \) -exec cp {} crashdumps/ \;
+                fi
+            """.trimIndent()
         }
         exec {
             name = "Package artifact"
@@ -143,6 +172,16 @@ class CarbonBuildMacOS(buildName: String, configType: String, preset: String, ag
                             +:<default>
                             +pr:*
                         """.trimIndent()
+        }
+    }
+
+    failureConditions {
+        failOnText {
+            conditionType = BuildFailureOnText.ConditionType.REGEXP
+            pattern = ".*(\\(\\d+(,\\d+)?\\) ?: (fatal )?error [A-Z]+\\d+:|:\\d+:\\d+: (fatal )?error:|error LNK\\d+:).*"
+            failureMessage = "Compiler or linker error found in the build log"
+            reverse = false
+            reportOnlyFirstMatch = false
         }
     }
 
