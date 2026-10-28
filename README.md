@@ -4,6 +4,7 @@ Single source of truth for audio interfaces shared between Carbon Trinity and Ca
 # Current Interfaces
 
 - `include/ITr2AudEmitter.h` - Interface for audio emitters
+- `include/ITr2AudParentBall.h` - Interface for telling an audio emitter which ball it is mounted on
 - `include/ITr2Audio.h` - Interface for audio functionality on assets
 - `include/IAudioInputMgr.h` - Interface for audio input management
 
