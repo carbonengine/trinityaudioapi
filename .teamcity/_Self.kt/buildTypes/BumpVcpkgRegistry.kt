@@ -65,7 +65,8 @@ object BumpVcpkgRegistry : BuildType({
 
                 curl --fail-with-body -sS -X POST "https://api.github.com/repos/%github_registry_repository%/pulls" \
                     -H "Authorization: Bearer %GITHUB_CARBON_PAT%" \
-                    -d "{\"title\": \"WIP: Bump %vcpkg_port_name% ${'$'}version\", \"head\": \"${'$'}branch\", \"base\": \"main\", \"draft\": true, \"body\": \"Automated bump for tag ${'$'}tag.\"}"
+                    -d "{\"title\": \"WIP: Bump %vcpkg_port_name% ${'$'}version\", \"head\": \"${'$'}branch\", \"base\": \"main\", \"draft\": true, \"body\": \"Automated bump for tag ${'$'}tag.\"}" \
+                    | python3 -c 'import json, sys; url = json.load(sys.stdin)["html_url"]; print("##teamcity[buildStatus text=\x27{build.status.text}; Draft PR: " + url + "\x27]")'
             """.trimIndent()
             dockerImage = "python:3.12"
             dockerImagePlatform = ScriptBuildStep.ImagePlatform.Linux
@@ -74,9 +75,9 @@ object BumpVcpkgRegistry : BuildType({
 
     triggers {
         vcs {
-            // Only fires if the VCS root's branch specification includes tags, e.g. +:refs/tags/v*
+            // Tags are reported as logical branch names (e.g. v3.2.0), which requires "Use tags as branches" on the VCS root
             branchFilter = """
-                +:refs/tags/v*
+                +:v*
             """.trimIndent()
         }
     }
