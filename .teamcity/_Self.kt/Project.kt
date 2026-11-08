@@ -21,4 +21,5 @@ object Project : Project({
     subProject(MacOS.Project)
 
     buildType(SyncToMirror)
+    buildType(BumpVcpkgRegistry)
 })
