@@ -79,5 +79,7 @@ object BumpVcpkgRegistry : BuildType({
 
     requirements {
         contains("teamcity.agent.jvm.os.name", "Linux")
+        // vcpkg only publishes a prebuilt Linux binary for x64, elsewhere bootstrapping it builds from source
+        equals("teamcity.agent.jvm.os.arch", "amd64")
     }
 })
