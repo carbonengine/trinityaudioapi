@@ -23,12 +23,14 @@ object BumpVcpkgRegistry : BuildType({
         param("github_registry_repository", "carbonengine/vcpkg-registry")
         param("git_user_name", "TeamCity")
         param("git_user_email", "teamcity@ccpgames.com")
+        param("env.GITHUB_TOKEN", "%GITHUB_CARBON_PAT%")
         param("teamcity.vcsTrigger.runBuildInNewEmptyBranch", "true")
     }
 
     vcs {
         root(DslContext.settingsRootId, "+:. => component")
         root(AbsoluteId("CarbonVcpkgRegistry"), "+:. => registry")
+        root(AbsoluteId("CarbonPipelineTools"), "+:. => carbon_pipeline_tools")
         checkoutMode = CheckoutMode.ON_AGENT
         cleanCheckout = true
     }
@@ -39,34 +41,20 @@ object BumpVcpkgRegistry : BuildType({
             scriptContent = """
                 set -euo pipefail
 
-                tag="%teamcity.build.vcs.branch.${DslContext.settingsRootId.id}%"
-                tag="${'$'}{tag#refs/tags/}"
-                echo "${'$'}tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+${'$'}' || { echo "${'$'}tag is not a release tag"; exit 0; }
-                version="${'$'}{tag#v}"
-                branch="bump-%vcpkg_port_name%-${'$'}version"
-                port="ports/%vcpkg_port_name%"
-
                 apt-get update -qq && apt-get install -y -qq --no-install-recommends zip
                 export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
                 git config --global --add safe.directory '*'
                 git config --global user.name "%git_user_name%"
                 git config --global user.email "%git_user_email%"
 
-                vcpkg_root="%teamcity.build.checkoutDir%/component/vendor/github.com/microsoft/vcpkg"
-                "${'$'}vcpkg_root/bootstrap-vcpkg.sh" -disableMetrics
-
-                cd registry
-                git switch -c "${'$'}branch"
-                sed -i -E "0,/^( *\"version\": )\"[^\"]*\"/s//\1\"${'$'}version\"/" "${'$'}port/vcpkg.json"
-                sed -i -E "s|^( *REF )[0-9a-f]{40}.*|\1%build.vcs.number.${DslContext.settingsRootId.id}% #${'$'}tag|" "${'$'}port/portfile.cmake"
-                git commit -a -m "Create ${'$'}tag port of %vcpkg_port_name%"
-                python3 tools/update_ports.py %vcpkg_port_name% --vcpkg-root "${'$'}vcpkg_root"
-                git push origin "${'$'}branch"
-
-                curl --fail-with-body -sS -X POST "https://api.github.com/repos/%github_registry_repository%/pulls" \
-                    -H "Authorization: Bearer %GITHUB_CARBON_PAT%" \
-                    -d "{\"title\": \"WIP: Bump %vcpkg_port_name% ${'$'}version\", \"head\": \"${'$'}branch\", \"base\": \"main\", \"draft\": true, \"body\": \"Automated bump for tag ${'$'}tag.\"}" \
-                    | python3 -c 'import json, sys; url = json.load(sys.stdin)["html_url"]; print("##teamcity[buildStatus text=\x27{build.status.text}; Draft PR: " + url + "\x27]")'
+                python3 carbon_pipeline_tools/carbon/bump-vcpkg-registry.py \
+                    --tag "%teamcity.build.vcs.branch.${DslContext.settingsRootId.id}%" \
+                    --commit "%build.vcs.number.${DslContext.settingsRootId.id}%" \
+                    --port "%vcpkg_port_name%" \
+                    --component-dir component \
+                    --registry-dir registry \
+                    --registry-repository "%github_registry_repository%" \
+                    --vcpkg-root component/vendor/github.com/microsoft/vcpkg
             """.trimIndent()
             dockerImage = "python:3.12"
             dockerImagePlatform = ScriptBuildStep.ImagePlatform.Linux
@@ -75,6 +63,7 @@ object BumpVcpkgRegistry : BuildType({
 
     triggers {
         vcs {
+            triggerRules = "+:root=${DslContext.settingsRootId.id}:."
             // Tags are reported as logical branch names (e.g. v3.2.0), which requires "Use tags as branches" on the VCS root
             branchFilter = """
                 +:v*
