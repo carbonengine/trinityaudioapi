@@ -39,7 +39,7 @@ object Project : Project({
 })
 
 
-class CarbonBuildWindows(buildName: String, configType: String, preset: String) : BuildType({
+class CarbonBuildWindows(buildName: String, configType: String, preset: String, vsDevBatSwitches: String = "-arch=x64 -vcvars_ver=14.51") : BuildType({
     id(buildName.toId())
     this.name = buildName
 
@@ -54,9 +54,7 @@ class CarbonBuildWindows(buildName: String, configType: String, preset: String) 
         param("env.GIT_TAG_HASH_OVERRIDE", "")
         param("github_checkout_folder", "github")
         param("env.CTEST_JUNIT_OUTPUT_FILE", "ctest_results.xml")
-        select("env.VISUAL_STUDIO_PLATFORM_TOOLSET", "v141", label = "Visual Studio Platform Toolset", description = "Specify the toolset for the build. e.g. v141 or v143.",
-                options = listOf("v141 (2017)" to "v141", "v143 (2022)" to "v143"))
-        param("VS_DEV_BAT_SWITCHES", "-arch=x64")
+        param("VS_DEV_BAT_SWITCHES", vsDevBatSwitches)
         param("env.CMAKE_BUILD_TARGETS", "all")
         param("env.CMAKE_INSTALL_PREFIX", ".build-artifact")
         param("env.CMAKE_CONFIG_TYPE", configType)
@@ -69,6 +67,7 @@ class CarbonBuildWindows(buildName: String, configType: String, preset: String) 
         param("env.CMAKE_PRESET", preset)
         param("env.VCPKG_BINARY_SOURCES", "clear;x-aws,s3://vcpkg-binary-cache-static/cache/,readwrite")
         param("env.X_VCPKG_REGISTRIES_CACHE", "%teamcity.build.checkoutDir%/%github_checkout_folder%/regcache")
+        param("env.VCPKG_MAX_CONCURRENCY", "8")
         param("env.CMAKE_BUILD_PARALLEL_LEVEL", "8")
         param("env.CTEST_PARALLEL_LEVEL", "8")
     }
@@ -150,12 +149,6 @@ class CarbonBuildWindows(buildName: String, configType: String, preset: String) 
             name = "Upload symbols to sentry"
             path = "sentry-cli"
             arguments = "upload-dif --wait %env.CMAKE_BUILD_FOLDER%"
-            param("script.content", """
-                #!/usr/bin/env bash -eu
-                filesWithSymbols = (
-                  # insert your binary files with symbols here!
-                )
-            """.trimIndent())
         }
         script {
             name = "(Windows) CMD Upload debug symbols to internal symbol server"
